@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="en" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sales Performance Dashboard</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Segoe UI', 'Aptos', 'Inter', 'sans-serif'] }
+                }
+            }
+        }
+    </script>
+    
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- PapaParse for CSV parsing -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+
+    <style>
+        /* Custom scrollbar for a cleaner look */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        .dark ::-webkit-scrollbar-thumb { background: #475569; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        
+        /* Select element styling */
+        select { background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%236b7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e"); background-position: right .5rem center; background-repeat: no-repeat; background-size: 1.5em 1.5em; padding-right: 2.5rem; }
+        .dark select { background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%239ca3af' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3e%3c/svg%3e"); }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 transition-colors duration-300 font-sans h-screen overflow-y-auto xl:overflow-hidden">
+    
+    <div class="max-w-[1920px] mx-auto h-full p-4 flex flex-col gap-4">
+        
+        <!-- HEADER -->
+        <header class="flex flex-col md:flex-row justify-between items-start md:items-center shrink-0">
+            <div>
+                <h1 class="text-2xl md:text-3xl font-bold tracking-tight flex items-center gap-2">
+                    <i data-lucide="trending-up" class="text-blue-500 w-7 h-7 md:w-8 md:h-8"></i>
+                    Sales Performance Dashboard
+                </h1>
+                <p class="text-xs md:text-sm mt-1 text-slate-500 dark:text-slate-400">Executive Overview & Dynamic Analytics</p>
+            </div>
+            <div class="flex items-center gap-3">
+                <input type="file" id="csvFileInput" accept=".csv" class="hidden">
+                <button id="uploadCsvBtn" class="flex items-center gap-2 px-4 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-sm font-semibold rounded-full shadow-sm transition-all">
+                    <i data-lucide="upload" class="w-4 h-4"></i>
+                    Upload CSV
+                </button>
+                <button id="themeToggle" class="p-2.5 rounded-full border bg-white border-slate-200 hover:bg-slate-100 dark:bg-slate-800 dark:border-slate-700 dark:hover:bg-slate-700 shadow-sm dark:shadow-none transition-all">
+                    <i data-lucide="moon" class="text-slate-600 dark:hidden w-5 h-5"></i>
+                    <i data-lucide="sun" class="text-yellow-400 hidden dark:block w-5 h-5"></i>
+                </button>
+            </div>
+        </header>
+
+        <!-- SLICERS (FILTERS) -->
+        <div class="p-3 rounded-xl border bg-white border-slate-200 shadow-sm dark:bg-slate-900 dark:border-slate-800 dark:shadow-none flex flex-wrap gap-3 items-end shrink-0">
+            <div class="flex items-center gap-2 mr-1 mb-2">
+                <i data-lucide="filter" class="text-slate-500 dark:text-slate-400 w-[18px] h-[18px]"></i>
+                <span class="text-sm font-semibold text-slate-500 dark:text-slate-400">Filters:</span>
+            </div>
+            
+            <div class="flex flex-col flex-1 min-w-[120px]">
+                <label class="text-xs font-semibold mb-1 text-slate-500 dark:text-slate-400">Month</label>
+                <select id="filter-month" class="text-sm px-2 py-1.5 rounded-lg border appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white border-slate-300 text-slate-900 dark:bg-slate-800 dark:border-slate-700 dark:text-white transition-colors">
+                    <option value="All">All Months</option>
+                </select>
+            </div>
+            <div class="flex flex-col flex-1 min-w-[120px]">
+                <label class="text-xs font-semibold mb-1 text-slate-500 dark:text-slate-400">Region</label>
+                <select id="filter-region" class="text-sm px-2 py-1.5 rounded-lg border appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white border-slate-300 text-slate-900 dark:bg-slate-800 dark:border-slate-700 dark:text-white transition-colors">
+                    <option value="All">All Regions</option>
+                </select>
+            </div>
+            <div class="flex flex-col flex-1 min-w-[120px]">
+                <label class="text-xs font-semibold mb-1 text-slate-500 dark:text-slate-400">Category</label>
+                <select id="filter-category" class="text-sm px-2 py-1.5 rounded-lg border appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white border-slate-300 text-slate-900 dark:bg-slate-800 dark:border-slate-700 dark:text-white transition-colors">
+                    <option value="All">All Categories</option>
+                </select>
+            </div>
+            <div class="flex flex-col flex-1 min-w-[120px]">
+                <label class="text-xs font-semibold mb-1 text-slate-500 dark:text-slate-400">Rep</label>
+                <select id="filter-rep" class="text-sm px-2 py-1.5 rounded-lg border appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white border-slate-300 text-slate-900 dark:bg-slate-800 dark:border-slate-700 dark:text-white transition-colors">
+                    <option value="All">All Reps</option>
+                </select>
+            </div>
+            <div class="flex flex-col flex-1 min-w-[120px]">
+                <label class="text-xs font-semibold mb-1 text-slate-500 dark:text-slate-400">Customer</label>
+                <select id="filter-customer" class="text-sm px-2 py-1.5 rounded-lg border appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white border-slate-300 text-slate-900 dark:bg-slate-800 dark:border-slate-700 dark:text-white transition-colors">
+                    <option value="All">All Customers</option>
+                </select>
+            </div>
+            <div class="flex flex-col flex-1 min-w-[120px]">
+                <label class="text-xs font-semibold mb-1 text-slate-500 dark:text-slate-400">Payment</label>
+                <select id="filter-payment" class="text-sm px-2 py-1.5 rounded-lg border appearance-none cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white border-slate-300 text-slate-900 dark:bg-slate-800 dark:border-slate-700 dark:text-white transition-colors">
+                    <option value="All">All Payments</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- ROW 1: KPI CARDS -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 shrink-0">
+            <!-- Card 1 -->
+            <div class="p-4 rounded-xl border bg-white border-slate-200 shadow-sm dark:bg-slate-900 dark:border-slate-800 dark:shadow-none flex flex-col justify-between hover:shadow-md transition-all">
+                <div class="flex justify-between items-start">
+                    <p class="text-sm font-medium text-slate-500 dark:text-slate-400">Total Sales Revenue</p>
+                    <div class="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800">
+                        <i data-lucide="dollar-sign" class="text-blue-600 dark:text-blue-400 w-[16px] h-[16px]"></i>
+                    </div>
+                </div>
+                <div class="mt-2 flex items-end justify-between">
+                    <h3 id="kpi-sales" class="text-2xl font-bold tracking-tight">$0</h3>
+                    <div class="flex items-center text-xs font-semibold text-emerald-500">
+                        <i data-lucide="arrow-up-right" class="w-3.5 h-3.5"></i><span>8.4%</span>
+                    </div>
+                </div>
+            </div>
+            <!-- Card 2 -->
+            <div class="p-4 rounded-xl border bg-white border-slate-200 shadow-sm dark:bg-slate-900 dark:border-slate-800 dark:shadow-none flex flex-col justify-between hover:shadow-md transition-all">
+                <div class="flex justify-between items-start">
+                    <p class="text-sm font-medium text-slate-500 dark:text-slate-400">Total Orders</p>
+                    <div class="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800">
+                        <i data-lucide="shopping-cart" class="text-blue-600 dark:text-blue-400 w-[16px] h-[16px]"></i>
+                    </div>
+                </div>
+                <div class="mt-2 flex items-end justify-between">
+                    <h3 id="kpi-orders" class="text-2xl font-bold tracking-tight">0</h3>
+                    <div class="flex items-center text-xs font-semibold text-emerald-500">
+                        <i data-lucide="arrow-up-right" class="w-3.5 h-3.5"></i><span>5.2%</span>
+                    </div>
+                </div>
+            </div>
+            <!-- Card 3 -->
+            <div class="p-4 rounded-xl border bg-white border-slate-200 shadow-sm dark:bg-slate-900 dark:border-slate-800 dark:shadow-none flex flex-col justify-between hover:shadow-md transition-all">
+                <div class="flex justify-between items-start">
+                    <p class="text-sm font-medium text-slate-500 dark:text-slate-400">Total Quantity Sold</p>
+                    <div class="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800">
+                        <i data-lucide="package" class="text-blue-600 dark:text-blue-400 w-[16px] h-[16px]"></i>
+                    </div>
+                </div>
+                <div class="mt-2 flex items-end justify-between">
+                    <h3 id="kpi-quantity" class="text-2xl font-bold tracking-tight">0</h3>
+                    <div class="flex items-center text-xs font-semibold text-rose-500">
+                        <i data-lucide="arrow-down-right" class="w-3.5 h-3.5"></i><span>2.1%</span>
+                    </div>
+                </div>
+            </div>
+            <!-- Card 4 -->
+            <div class="p-4 rounded-xl border bg-white border-slate-200 shadow-sm dark:bg-slate-900 dark:border-slate-800 dark:shadow-none flex flex-col justify-between hover:shadow-md transition-all">
+                <div class="flex justify-between items-start">
+                    <p class="text-sm font-medium text-slate-500 dark:text-slate-400">Average Order Value</p>
+                    <div class="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800">
+                        <i data-lucide="trending-up" class="text-blue-600 dark:text-blue-400 w-[16px] h-[16px]"></i>
+                    </div>
+                </div>
+                <div class="mt-2 flex items-end justify-between">
+                    <h3 id="kpi-aov" class="text-2xl font-bold tracking-tight">$0</h3>
+                    <div class="flex items-center text-xs font-semibold text-emerald-500">
+                        <i data-lucide="arrow-up-right" class="w-3.5 h-3.5"></i><span>12.5%</span>
+                    </div>
+                </div>
+            </div>
+            <!-- Card 5 -->
+            <div class="p-4 rounded-xl border bg-white border-slate-200 shadow-sm dark:bg-slate-900 dark:border-slate-800 dark:shadow-none flex flex-col justify-between hover:shadow-md transition-all">
+                <div class="flex justify-between items-start">
+                    <p class="text-sm font-medium text-slate-500 dark:text-slate-400">Average Discount</p>
+                    <div class="p-1.5 rounded-lg bg-slate-100 dark:bg-slate-800">
+                        <i data-lucide="percent" class="text-blue-600 dark:text-blue-400 w-[16px] h-[16px]"></i>
+                    </div>
+                </div>
+                <div class="mt-2 flex items-end justify-between">
+                    <h3 id="kpi-discount" class="text-2xl font-bold tracking-tight">0%</h3>
+                    <div class="flex items-center text-xs font-semibold text-rose-500">
+                        <i data-lucide="arrow-down-right" class="w-3.5 h-3.5"></i><span>1.4%</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ROW 2 & 3: CHARTS -->
+        <div class="flex-grow grid grid-cols-1 lg:grid-cols-3 lg:grid-rows-2 gap-4 min-h-0 pb-2">
+            
+            <!-- 1. Monthly Sales Trend -->
+            <div class="p-4 rounded-xl border bg-white border-slate-200 shadow-sm dark:bg-slate-900 dark:border-slate-800 dark:shadow-none flex flex-col min-h-[250px] lg:min-h-0">
+                <h3 class="text-sm font-semibold mb-2 shrink-0">Monthly Sales Trend</h3>
+                <div class="flex-grow w-full relative min-h-0">
+                    <canvas id="chart-monthly"></canvas>
+                </div>
+            </div>
+
+            <!-- 2. Sales by Region -->
+            <div class="p-4 rounded-xl border bg-white border-slate-200 shadow-sm dark:bg-slate-900 dark:border-slate-800 dark:shadow-none flex flex-col min-h-[250px] lg:min-h-0">
+                <h3 class="text-sm font-semibold mb-2 shrink-0">Sales by Region</h3>
+                <div class="flex-grow w-full relative min-h-0">
+                    <canvas id="chart-region"></canvas>
+                </div>
+            </div>
+
+            <!-- 3. Product Category Performance -->
+            <div class="p-4 rounded-xl border bg-white border-slate-200 shadow-sm dark:bg-slate-900 dark:border-slate-800 dark:shadow-none flex flex-col min-h-[250px] lg:min-h-0">
+                <h3 class="text-sm font-semibold mb-2 shrink-0">Category Performance</h3>
+                <div class="flex-grow w-full relative min-h-0">
+                    <canvas id="chart-category"></canvas>
+                </div>
+            </div>
+
+            <!-- 4. Customer Type Analysis -->
+            <div class="p-4 rounded-xl border bg-white border-slate-200 shadow-sm dark:bg-slate-900 dark:border-slate-800 dark:shadow-none flex flex-col min-h-[250px] lg:min-h-0">
+                <h3 class="text-sm font-semibold mb-2 shrink-0">Customer Types (Orders)</h3>
+                <div class="flex-grow w-full relative min-h-0">
+                    <canvas id="chart-customer"></canvas>
+                </div>
+            </div>
+
+            <!-- 5. Sales Representative Performance -->
+            <div class="p-4 rounded-xl border bg-white border-slate-200 shadow-sm dark:bg-slate-900 dark:border-slate-800 dark:shadow-none flex flex-col min-h-[250px] lg:min-h-0">
+                <h3 class="text-sm font-semibold mb-2 shrink-0">Top Sales Representatives</h3>
+                <div class="flex-grow w-full relative min-h-0">
+                    <canvas id="chart-rep"></canvas>
+                </div>
+            </div>
+
+            <!-- 6. Payment Method Breakdown -->
+            <div class="p-4 rounded-xl border bg-white border-slate-200 shadow-sm dark:bg-slate-900 dark:border-slate-800 dark:shadow-none flex flex-col min-h-[250px] lg:min-h-0">
+                <h3 class="text-sm font-semibold mb-2 shrink-0">Payment Methods</h3>
+                <div class="flex-grow w-full relative min-h-0">
+                    <canvas id="chart-payment"></canvas>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- MAIN JAVASCRIPT LOGIC -->
+    <script>
+        // Initialize Lucide Icons
+        lucide.createIcons();
+
+        // --- THEME MANAGEMENT ---
+        let isDarkMode = false;
+        const htmlElement = document.documentElement;
+        const themeBtn = document.getElementById('themeToggle');
+
+        // Color palettes
+        const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'];
+        const DARK_COLORS = ['#60a5fa', '#34d399', '#fbbf24', '#f87171', '#a78bfa', '#22d3ee'];
+        
+        const getGridColor = () => isDarkMode ? '#334155' : '#e2e8f0';
+        const getTextColor = () => isDarkMode ? '#94a3b8' : '#64748b';
+        const getTooltipBg = () => isDarkMode ? '#0f172a' : '#ffffff';
+        const getTooltipColor = () => isDarkMode ? '#f8fafc' : '#0f172a';
+        const getCurrentPalette = () => isDarkMode ? DARK_COLORS : COLORS;
+
+        // Chart instances dictionary to allow updating
+        const charts = {};
+
+        themeBtn.addEventListener('click', () => {
+            isDarkMode = !isDarkMode;
+            if (isDarkMode) {
+                htmlElement.classList.add('dark');
+            } else {
+                htmlElement.classList.remove('dark');
+            }
+            updateChartThemes();
+        });
+
+        // --- CSV DATA PROCESSING ---
+        let rawData = [];
+        let filteredData = [];
+
+        const processCSVData = (parsedRows) => {
+            const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            
+            // Map the CSV schema to the Dashboard schema
+            return parsedRows.filter(row => row.Sale_Date && row.Sales_Amount).map((row, index) => {
+                // Parse date (e.g., "12-11-2023" -> Nov)
+                const dateParts = row.Sale_Date.split('-');
+                const monthIdx = dateParts.length === 3 ? parseInt(dateParts[1], 10) - 1 : 0;
+
+                return {
+                    id: row['S.NO.'] || index,
+                    month: monthNames[monthIdx] || 'Unknown',
+                    monthIndex: monthIdx,
+                    region: row.Region || 'Unknown',
+                    category: row.Product_Category || 'Unknown',
+                    customerType: row.Customer_Type || 'Unknown',
+                    salesRep: row.Sales_Rep || 'Unknown',
+                    paymentMethod: row.Payment_Method || 'Unknown',
+                    salesChannel: row.Sales_Channel || 'Unknown',
+                    revenue: parseFloat(row.Sales_Amount) || 0,
+                    quantity: parseInt(row.Quantity_Sold, 10) || 0,
+                    discount: (parseFloat(row.Discount) || 0) * 100 // Convert decimal to %
+                };
+            }).sort((a, b) => a.monthIndex - b.monthIndex);
+        };
+
+        const populateFilters = () => {
+            const createOptions = (data, key, defaultLabel) => {
+                const unique = [...new Set(data.map(item => item[key]))].filter(Boolean).sort();
+                return `<option value="All">All ${defaultLabel}</option>` + unique.map(v => `<option value="${v}">${v}</option>`).join('');
+            };
+            
+            // Always show all 12 months in order
+            const monthsOrder = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            document.getElementById('filter-month').innerHTML = `<option value="All">All Months</option>` + monthsOrder.map(v => `<option value="${v}">${v}</option>`).join('');
+            
+            document.getElementById('filter-region').innerHTML = createOptions(rawData, 'region', 'Regions');
+            document.getElementById('filter-category').innerHTML = createOptions(rawData, 'category', 'Categories');
+            document.getElementById('filter-rep').innerHTML = createOptions(rawData, 'salesRep', 'Reps');
+            document.getElementById('filter-customer').innerHTML = createOptions(rawData, 'customerType', 'Customers');
+            document.getElementById('filter-payment').innerHTML = createOptions(rawData, 'paymentMethod', 'Payments');
+        };
+
+        const loadSampleData = () => {
+            const sampleCSV = `S.NO.,Sale_Date,Sales_Rep,Region,Sales_Amount,Quantity_Sold,Product_Category,Unit_Cost,Unit_Price,Customer_Type,Discount,Payment_Method,Sales_Channel,Region_and_Sales_Rep
+1001,12-11-2023,Alice,North,715.81,8,Electronics,3657.91,3729.27,New,0.09,Bank Transfer,Retail,North-Alice
+1001,14-05-2023,Eve,South,2669.46,35,Electronics,2745.75,3244.76,New,0.05,Bank Transfer,Online,South-Eve
+1001,10-10-2023,David,West,3780.07,18,Furniture,2602.6,3013.49,Returning,0.08,Bank Transfer,Online,West-David
+1001,14-09-2023,Eve,South,2126.33,39,Food,2437.26,2889.67,Returning,0.25,Cash,Online,South-Eve
+1001,18-02-2023,David,West,7154.95,27,Clothing,939.02,1286.92,Returning,0.07,Credit Card,Retail,West-David
+1099,02-10-2023,Bob,West,1514.14,43,Clothing,906.47,1283.04,New,0.24,Cash,Online,West-Bob
+1099,29-08-2023,Alice,West,4567.81,44,Clothing,4933.11,5245.86,Returning,0.13,Bank Transfer,Retail,West-Alice
+1099,14-02-2023,David,South,7802.45,32,Clothing,1517.86,1948.46,New,0.02,Credit Card,Online,South-David
+1099,15-10-2023,David,East,6807.56,39,Electronics,3592.89,4004,New,0.13,Cash,Online,East-David
+1099,26-08-2023,David,West,1934.18,17,Food,2471.73,2568.73,New,0.05,Cash,Retail,West-David
+1099,03-04-2023,Alice,North,2571.72,30,Furniture,4495.82,4794.01,New,0.18,Bank Transfer,Retail,North-Alice`;
+
+            const parsed = Papa.parse(sampleCSV, { header: true, skipEmptyLines: true });
+            rawData = processCSVData(parsed.data);
+            filteredData = [...rawData];
+            populateFilters();
+            updateDashboard();
+        };
+
+        // --- FILE UPLOAD LOGIC ---
+        document.getElementById('uploadCsvBtn').addEventListener('click', () => {
+            document.getElementById('csvFileInput').click();
+        });
+
+        document.getElementById('csvFileInput').addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const csvText = event.target.result;
+                Papa.parse(csvText, {
+                    header: true,
+                    skipEmptyLines: true,
+                    complete: (results) => {
+                        rawData = processCSVData(results.data);
+                        filteredData = [...rawData];
+                        
+                        // Reset all select UI values to "All"
+                        document.querySelectorAll('select').forEach(sel => sel.value = 'All');
+                        
+                        populateFilters();
+                        updateDashboard();
+                    },
+                    error: (error) => {
+                        alert("Error parsing CSV: " + error.message);
+                    }
+                });
+            };
+            reader.readAsText(file);
+        });
+
+        // --- FORMATTING HELPERS ---
+        const formatCurrency = (val) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(val);
+        const formatK = (val) => '$' + (val / 1000).toFixed(0) + 'k';
+        const formatNumber = (val) => new Intl.NumberFormat('en-US').format(val);
+
+        // --- AGGREGATION LOGIC ---
+        const aggregateData = (data, key, measure = 'revenue') => {
+            const map = {};
+            data.forEach(item => {
+                const k = item[key];
+                if (!map[k]) map[k] = 0;
+                map[k] += (measure === 'id' ? 1 : item[measure]); // Use 1 for counting
+            });
+            return Object.keys(map).map(k => ({ name: k, value: map[k] }));
+        };
+
+        // --- GLOBAL CHART.JS CONFIG ---
+        Chart.defaults.font.family = "'Segoe UI', 'Aptos', 'Inter', sans-serif";
+        Chart.defaults.responsive = true;
+        Chart.defaults.maintainAspectRatio = false;
+        Chart.defaults.plugins.tooltip.padding = 10;
+        Chart.defaults.plugins.tooltip.cornerRadius = 8;
+        Chart.defaults.plugins.tooltip.boxPadding = 6;
+        Chart.defaults.plugins.tooltip.usePointStyle = true;
+
+        // --- UPDATE UI LOGIC ---
+        const updateDashboard = () => {
+            // 1. Calculate KPIs
+            const totalSales = filteredData.reduce((sum, item) => sum + item.revenue, 0);
+            const totalOrders = filteredData.length;
+            const totalQuantity = filteredData.reduce((sum, item) => sum + item.quantity, 0);
+            const aov = totalOrders > 0 ? totalSales / totalOrders : 0;
+            const avgDiscount = totalOrders > 0 ? filteredData.reduce((sum, item) => sum + item.discount, 0) / totalOrders : 0;
+
+            // Update DOM KPIs
+            document.getElementById('kpi-sales').innerText = formatCurrency(totalSales);
+            document.getElementById('kpi-orders').innerText = formatNumber(totalOrders);
+            document.getElementById('kpi-quantity').innerText = formatNumber(totalQuantity);
+            document.getElementById('kpi-aov').innerText = formatCurrency(aov);
+            document.getElementById('kpi-discount').innerText = avgDiscount.toFixed(1) + '%';
+
+            // 2. Aggregate Data for Charts
+            const monthsOrder = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            let monthlyAgg = aggregateData(filteredData, 'month').sort((a, b) => monthsOrder.indexOf(a.name) - monthsOrder.indexOf(b.name));
+            let regionAgg = aggregateData(filteredData, 'region');
+            let categoryAgg = aggregateData(filteredData, 'category');
+            let customerAgg = aggregateData(filteredData, 'customerType', 'id'); // count
+            let repAgg = aggregateData(filteredData, 'salesRep').sort((a, b) => b.value - a.value); // desc
+            let paymentAgg = aggregateData(filteredData, 'paymentMethod');
+
+            // 3. Update or Initialize Charts
+            const palette = getCurrentPalette();
+
+            updateOrInitChart('chart-monthly', 'line', monthlyAgg, {
+                color: palette[0],
+                label: 'Revenue',
+                formatY: formatK,
+                formatTooltip: formatCurrency
+            });
+
+            updateOrInitChart('chart-region', 'doughnut', regionAgg, {
+                colors: palette,
+                formatTooltip: formatCurrency
+            });
+
+            updateOrInitChart('chart-category', 'bar', categoryAgg, {
+                color: palette[1],
+                label: 'Revenue',
+                formatY: formatK,
+                formatTooltip: formatCurrency
+            });
+
+            updateOrInitChart('chart-customer', 'pie', customerAgg, {
+                colors: [palette[2], palette[3]],
+                formatTooltip: (v) => formatNumber(v) + ' Orders'
+            });
+
+            updateOrInitChart('chart-rep', 'horizontalBar', repAgg, {
+                color: palette[4],
+                label: 'Revenue',
+                formatY: formatK,
+                formatTooltip: formatCurrency
+            });
+
+            updateOrInitChart('chart-payment', 'bar', paymentAgg, {
+                color: palette[3],
+                label: 'Revenue',
+                formatY: formatK,
+                formatTooltip: formatCurrency
+            });
+        };
+
+        const updateOrInitChart = (canvasId, type, dataArr, options) => {
+            const ctx = document.getElementById(canvasId).getContext('2d');
+            const labels = dataArr.map(d => d.name);
+            const dataValues = dataArr.map(d => d.value);
+            
+            const isDark = htmlElement.classList.contains('dark');
+            const gridCol = getGridColor();
+            const textCol = getTextColor();
+            const ttBg = getTooltipBg();
+            const ttText = getTooltipColor();
+
+            // Destroy existing if re-initializing type or completely replacing
+            if (charts[canvasId]) {
+                charts[canvasId].destroy();
+            }
+
+            let config = {
+                type: type === 'horizontalBar' ? 'bar' : type,
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: options.label || 'Value',
+                        data: dataValues,
+                        backgroundColor: options.colors || options.color,
+                        borderColor: type === 'line' ? options.color : (isDarkMode ? '#0f172a' : '#ffffff'),
+                        borderWidth: (type === 'pie' || type === 'doughnut') ? 2 : 0,
+                        tension: 0.4,
+                        pointRadius: type === 'line' ? 4 : 0,
+                        pointHoverRadius: type === 'line' ? 6 : 0,
+                        pointBackgroundColor: type === 'line' ? options.color : undefined,
+                        borderRadius: (type === 'bar' || type === 'horizontalBar') ? 4 : 0,
+                    }]
+                },
+                options: {
+                    indexAxis: type === 'horizontalBar' ? 'y' : 'x',
+                    plugins: {
+                        legend: {
+                            display: (type === 'pie' || type === 'doughnut'),
+                            position: 'bottom',
+                            labels: { color: textCol, usePointStyle: true, boxWidth: 8 }
+                        },
+                        tooltip: {
+                            backgroundColor: ttBg,
+                            titleColor: ttText,
+                            bodyColor: ttText,
+                            borderColor: gridCol,
+                            borderWidth: 1,
+                            callbacks: {
+                                label: function(context) {
+                                    let val = context.raw;
+                                    return ' ' + (options.formatTooltip ? options.formatTooltip(val) : val);
+                                }
+                            }
+                        }
+                    },
+                    scales: (type === 'pie' || type === 'doughnut') ? {} : {
+                        x: {
+                            grid: { display: false, drawBorder: false },
+                            ticks: { color: textCol, font: { size: 11 } },
+                            border: { display: false }
+                        },
+                        y: {
+                            grid: { 
+                                color: type === 'horizontalBar' ? 'transparent' : gridCol,
+                                drawBorder: false, 
+                                borderDash: [3, 3] 
+                            },
+                            ticks: { 
+                                color: textCol, 
+                                font: { size: 11 },
+                                callback: function(val) {
+                                    return options.formatY && type !== 'horizontalBar' ? options.formatY(val) : val;
+                                }
+                            },
+                            border: { display: false }
+                        }
+                    }
+                }
+            };
+
+            // Exception for horizontal bar Y-axis text
+            if (type === 'horizontalBar') {
+                config.options.scales.x.grid = { color: gridCol, drawBorder: false, borderDash: [3, 3] };
+                config.options.scales.x.ticks.callback = function(val) { return options.formatY ? options.formatY(val) : val; };
+            }
+
+            charts[canvasId] = new Chart(ctx, config);
+        };
+
+        const updateChartThemes = () => {
+            // Re-render completely for theme changes to ensure borders/colors map properly
+            updateDashboard();
+        };
+
+        // --- FILTERING LOGIC ---
+        const handleFilterChange = () => {
+            const fMonth = document.getElementById('filter-month').value;
+            const fRegion = document.getElementById('filter-region').value;
+            const fCategory = document.getElementById('filter-category').value;
+            const fRep = document.getElementById('filter-rep').value;
+            const fCustomer = document.getElementById('filter-customer').value;
+            const fPayment = document.getElementById('filter-payment').value;
+
+            filteredData = rawData.filter(item => {
+                return (fMonth === 'All' || item.month === fMonth) &&
+                       (fRegion === 'All' || item.region === fRegion) &&
+                       (fCategory === 'All' || item.category === fCategory) &&
+                       (fRep === 'All' || item.salesRep === fRep) &&
+                       (fCustomer === 'All' || item.customerType === fCustomer) &&
+                       (fPayment === 'All' || item.paymentMethod === fPayment);
+            });
+
+            updateDashboard();
+        };
+
+        // Bind filter events
+        document.querySelectorAll('select').forEach(select => {
+            select.addEventListener('change', handleFilterChange);
+        });
+
+        // Initialize dashboard on load
+        window.addEventListener('DOMContentLoaded', () => {
+            // Check system preference for dark mode (optional enhancement)
+            if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+                isDarkMode = true;
+                htmlElement.classList.add('dark');
+            }
+            loadSampleData(); // Load the mock snippet automatically
+        });
+
+    </script>
+</body>
+</html>
