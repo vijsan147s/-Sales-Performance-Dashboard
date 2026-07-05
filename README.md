@@ -4,6 +4,10 @@ This project contains a sales dataset, exploratory analysis notebooks, exported 
 
 The main output is a **Sales Performance Dashboard** that gives an executive overview of sales revenue, order volume, product performance, regional sales, customer behavior, payment methods, and monthly trends.
 
+## Dashboard Preview
+
+![Sales Performance Dashboard](Dashboard.png)
+
 ## Project Files
 
 | File | Description |
